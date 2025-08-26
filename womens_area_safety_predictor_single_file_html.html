@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Women's Area Safety Predictor</title>
+  <style>
+    :root {
+      --bg: #0f1221;
+      --card: #161a2e;
+      --ink: #e7e9ff;
+      --muted: #aab0d6;
+      --accent: #6a7dff;
+      --good: #00c853;
+      --warn: #ffd54f;
+      --bad: #ff5252;
+      --ring: 24, 38, 80; /* for shadows */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial;
+      background: radial-gradient(1200px 600px at 80% -10%, #1e2347 0%, var(--bg) 40%), var(--bg);
+      color: var(--ink);
+    }
+    .wrap {
+      max-width: 1100px; margin: 0 auto; padding: 24px; display: grid; gap: 20px;
+      grid-template-columns: 1fr; grid-auto-rows: min-content;
+    }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .title { font-size: clamp(20px, 3vw, 32px); font-weight: 800; letter-spacing: .3px; }
+    .subtitle { color: var(--muted); font-size: 14px; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.0)), var(--card); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 18px; box-shadow: 0 10px 30px rgba(var(--ring), .35), inset 0 1px 0 rgba(255,255,255,.04); }
+    .grid { display: grid; gap: 14px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (max-width: 900px){ .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+    label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+    input[type="text"], input[type="number"], select { width: 100%; padding: 10px 12px; background: #0e1226; color: var(--ink); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; outline: none; }
+    input[type="range"] { width: 100%; }
+    .row { display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: center; }
+
+    .btn { appearance: none; background: linear-gradient(180deg, #7a8cff, #5f72ff); color: white; padding: 12px 16px; border: 0; border-radius: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 12px 24px rgba(67, 86, 255, .35); }
+    .btn:active { transform: translateY(1px); }
+    .ghost { background: transparent; color: var(--ink); border: 1px solid rgba(255,255,255,0.12); box-shadow: none; }
+
+    /* Gauge */
+    .gauge-wrap { display:flex; gap: 18px; align-items:center; justify-content:center; flex-wrap: wrap; }
+    .gauge {
+      --val: 0; /* 0..100 */
+      width: 200px; height: 200px; border-radius: 50%; position: relative;
+      background:
+        conic-gradient(
+          var(--good) 0deg,
+          var(--good) calc(120deg * (min(var(--val),33)/100) * 3),
+          var(--warn) calc(120deg * (min(var(--val),66)/100) * 1.5),
+          var(--bad) calc(120deg * (var(--val)/100) * 1.2)
+        );
+      mask: radial-gradient(circle 74px, transparent 74px, black 75px);
+      display:grid; place-items:center;
+      box-shadow: 0 8px 20px rgba(0,0,0,.35), inset 0 0 0 10px #0d1122;
+    }
+    .gauge::after{
+      content: attr(data-label);
+      position:absolute; inset: 0; display:grid; place-items:center; text-align:center; padding: 12px; font-weight: 800; font-size: 28px;
+    }
+    .pill { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; border: 1px solid rgba(255,255,255,0.14); color: var(--muted); }
+    .score-note { font-size: 13px; color: var(--muted); }
+
+    ul.tips { display:grid; gap: 8px; padding-left: 16px; margin: 0; }
+    ul.tips li { color: var(--ink); }
+    .tag { font-size: 12px; padding: 6px 10px; border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; color: var(--muted); }
+
+    .footer { color: var(--muted); font-size: 12px; text-align: center; }
+    .danger { color: #ffcdd2; }
+    .ok { color: #c8e6c9; }
+    .warn { color: #ffe0b2; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="title">Women's Area Safety Predictor</div>
+        <div class="subtitle">Quick, heuristic risk score based on context factors. <strong>Not a substitute for local guidance or emergency services.</strong></div>
+      </div>
+      <div class="pill">Demo • Client‑side only</div>
+    </header>
+
+    <section class="card grid grid-3" id="inputs-card">
+      <div>
+        <label for="location">Location (landmark / area)</label>
+        <input id="location" type="text" placeholder="e.g., MG Road, Bengaluru" />
+      </div>
+      <div>
+        <label for="time">Time of day</label>
+        <select id="time">
+          <option value="day">Day (06:00–18:00)</option>
+          <option value="evening">Evening (18:00–22:00)</option>
+          <option value="night">Night (22:00–04:00)</option>
+          <option value="early">Early Morning (04:00–06:00)</option>
+        </select>
+      </div>
+      <div>
+        <label for="day">Day of week</label>
+        <select id="day">
+          <option value="weekday">Weekday</option>
+          <option value="weekend">Weekend</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="lighting">Street lighting</label>
+        <div class="row">
+          <input id="lighting" type="range" min="0" max="10" value="6" />
+          <span class="tag" id="lightingVal">6 / 10</span>
+        </div>
+      </div>
+      <div>
+        <label for="crowd">Crowd density</label>
+        <div class="row">
+          <input id="crowd" type="range" min="0" max="10" value="5" />
+          <span class="tag" id="crowdVal">5 / 10</span>
+        </div>
+      </div>
+      <div>
+        <label for="police">Visible security/police</label>
+        <div class="row">
+          <input id="police" type="range" min="0" max="10" value="3" />
+          <span class="tag" id="policeVal">3 / 10</span>
+        </div>
+      </div>
+
+      <div>
+        <label for="reports">Recent incident reports (last 30 days)</label>
+        <div class="row">
+          <input id="reports" type="number" min="0" step="1" value="0" />
+          <span class="tag">count</span>
+        </div>
+      </div>
+      <div>
+        <label for="transport">Nearby public transport within 300m</label>
+        <select id="transport">
+          <option value="none">No</option>
+          <option value="some">Bus stop or stand</option>
+          <option value="good">Metro/rail or multiple options</option>
+        </select>
+      </div>
+      <div>
+        <label for="company">Traveling</label>
+        <select id="company">
+          <option value="alone">Alone</option>
+          <option value="pair">With 1 person</option>
+          <option value="group">In a group (3+)</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="familiarity">Your familiarity with the area</label>
+        <div class="row">
+          <input id="familiarity" type="range" min="0" max="10" value="4" />
+          <span class="tag" id="familiarityVal">4 / 10</span>
+        </div>
+      </div>
+      <div>
+        <label for="shareLive">Live location shared with trusted contact?</label>
+        <select id="shareLive">
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:end; gap:10px; justify-content:flex-end">
+        <button class="btn ghost" id="resetBtn" type="button">Reset</button>
+        <button class="btn" id="predictBtn" type="button">Predict Safety</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="gauge-wrap">
+        <div>
+          <div class="pill" id="statusPill">Status: —</div>
+          <div class="score-note" id="scoreNote">Click Predict to compute a score.</div>
+        </div>
+        <div class="gauge" id="gauge" aria-label="Risk gauge" data-label="—" style="--val:0"></div>
+        <div>
+          <div class="pill">Score scale</div>
+          <ul class="tips" style="margin-top:8px">
+            <li><span class="ok">0–33 = Lower risk</span> (stay aware; standard precautions)</li>
+            <li><span class="warn">34–66 = Moderate risk</span> (extra caution, plan route)</li>
+            <li><span class="danger">67–100 = Higher risk</span> (avoid if possible, choose alternatives)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3 style="margin: 0 0 8px 0">Contextual Tips</h3>
+      <ul class="tips" id="tipsList"></ul>
+    </section>
+
+    <p class="footer">This tool is a heuristic estimator for educational/demo use. It does <strong>not</strong> use real crime data and cannot guarantee safety. In an emergency, contact local authorities immediately.</p>
+  </div>
+
+  <script>
+    // Utility: clamp
+    const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+
+    // Bind range value mirrors
+    ["lighting","crowd","police","familiarity"].forEach(id => {
+      const el = document.getElementById(id);
+      const out = document.getElementById(id+"Val");
+      el.addEventListener('input', () => out.textContent = `${el.value} / 10`);
+    });
+
+    const gauge = document.getElementById('gauge');
+    const statusPill = document.getElementById('statusPill');
+    const scoreNote = document.getElementById('scoreNote');
+    const tipsList = document.getElementById('tipsList');
+
+    function computeScore(){
+      // Gather inputs
+      const time = document.getElementById('time').value; // day, evening, night, early
+      const day = document.getElementById('day').value; // weekday, weekend
+      const lighting = +document.getElementById('lighting').value; // 0..10 (good -> safer)
+      const crowd = +document.getElementById('crowd').value; // 0..10 (mid is safer)
+      const police = +document.getElementById('police').value; // 0..10 (more -> safer)
+      const reports = +document.getElementById('reports').value; // 0..∞ (more -> risk)
+      const transport = document.getElementById('transport').value; // none/some/good
+      const company = document.getElementById('company').value; // alone/pair/group
+      const familiarity = +document.getElementById('familiarity').value; // 0..10 (more -> safer)
+      const shareLive = document.getElementById('shareLive').value; // yes/no
+
+      // Heuristic model (0 safe .. 100 risky)
+      // Start at baseline
+      let risk = 35;
+
+      // Time of day weights
+      risk += ({day: -6, evening: 5, night: 18, early: 10})[time] ?? 0;
+
+      // Day of week (late nights on weekends tend to be busier & riskier)
+      risk += (day === 'weekend' && (time === 'evening' || time === 'night')) ? 5 : 0;
+
+      // Lighting (good lighting reduces risk)
+      risk += (10 - lighting) * 1.8;
+
+      // Crowd density: very low or very high can elevate risk; medium safer
+      const crowdDelta = Math.abs(crowd - 6); // distance from sweet spot ~6
+      risk += crowdDelta * 2.0;
+
+      // Visible security reduces risk
+      risk += (10 - police) * 1.4;
+
+      // Recent incident reports scale (soft cap past 15)
+      const rpt = Math.min(reports, 30);
+      risk += rpt * 1.2;
+
+      // Transport availability (escape/assistance options)
+      risk += ({none: 8, some: 2, good: -4})[transport] ?? 0;
+
+      // Company
+      risk += ({alone: 6, pair: 0, group: -6})[company] ?? 0;
+
+      // Familiarity
+      risk += (10 - familiarity) * 1.2;
+
+      // Live-share slight reduction
+      risk += (shareLive === 'yes') ? -3 : 2;
+
+      // Normalize
+      risk = clamp(Math.round(risk), 0, 100);
+
+      return { risk, inputs: {time, day, lighting, crowd, police, reports, transport, company, familiarity, shareLive} };
+    }
+
+    function statusFor(score){
+      if (score <= 33) return {label: 'Lower risk', cls: 'ok'};
+      if (score <= 66) return {label: 'Moderate', cls: 'warn'};
+      return {label: 'Higher risk', cls: 'danger'};
+    }
+
+    function tipsFor(ctx){
+      const t = [];
+      const {time, day, lighting, crowd, police, reports, transport, company, familiarity, shareLive} = ctx.inputs;
+
+      if (time === 'night' || time === 'early') t.push('Prefer well‑lit, busier roads at late hours; avoid isolated shortcuts.');
+      if (lighting <= 4) t.push('Choose routes with better street lighting; carry a small torch on your phone.');
+      if (police <= 3) t.push('Note nearest open shops, kiosks, or security posts as safe points.');
+      if (transport === 'none') t.push('Identify nearest cab stand/metro before starting; arrange pickup if possible.');
+      if (company === 'alone') t.push('Share trip details with a trusted contact; set check‑ins.');
+      if (familiarity <= 3) t.push('Preview your route on a map and mark landmarks to avoid stops for directions.');
+      if (reports >= 3) t.push('Recent incidents reported. Consider alternate time/route or travel with company.');
+      if (crowd <= 2) t.push('Area seems isolated. Stick to main roads or wait for company.');
+      if (crowd >= 9) t.push('Very crowded zone—secure belongings and plan exits.');
+      if (shareLive === 'no') t.push('Enable live location sharing or SOS shortcuts on your phone.');
+      if (t.length === 0) t.push('Keep general precautions: stay aware, keep phone charged, and trust your instincts.');
+      return t;
+    }
+
+    function render(){
+      const ctx = computeScore();
+      const { risk } = ctx;
+      const s = statusFor(risk);
+
+      gauge.style.setProperty('--val', risk);
+      gauge.setAttribute('data-label', `${risk}`);
+      statusPill.textContent = `Status: ${s.label}`;
+      statusPill.className = `pill ${s.cls}`;
+      scoreNote.textContent = risk <= 33 ? 'Area appears relatively lower risk. Stay aware and use standard precautions.'
+        : risk <= 66 ? 'Mixed signals. Apply extra caution and consider route/time alternatives.'
+        : 'Context suggests higher risk. If possible, choose a safer route or travel with company.';
+
+      // Tips
+      tipsList.innerHTML = '';
+      tipsFor(ctx).forEach(t => {
+        const li = document.createElement('li');
+        li.textContent = t;
+        tipsList.appendChild(li);
+      });
+    }
+
+    document.getElementById('predictBtn').addEventListener('click', render);
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      document.getElementById('location').value = '';
+      document.getElementById('time').value = 'day';
+      document.getElementById('day').value = 'weekday';
+      document.getElementById('lighting').value = 6; document.getElementById('lightingVal').textContent = '6 / 10';
+      document.getElementById('crowd').value = 5; document.getElementById('crowdVal').textContent = '5 / 10';
+      document.getElementById('police').value = 3; document.getElementById('policeVal').textContent = '3 / 10';
+      document.getElementById('reports').value = 0;
+      document.getElementById('transport').value = 'none';
+      document.getElementById('company').value = 'alone';
+      document.getElementById('familiarity').value = 4; document.getElementById('familiarityVal').textContent = '4 / 10';
+      document.getElementById('shareLive').value = 'no';
+      gauge.style.setProperty('--val', 0);
+      gauge.setAttribute('data-label', '—');
+      statusPill.textContent = 'Status: —';
+      statusPill.className = 'pill';
+      scoreNote.textContent = 'Click Predict to compute a score.';
+      tipsList.innerHTML = '';
+    });
+
+    // Auto-run once for initial preview
+    render();
+  </script>
+</body>
+</html>
